@@ -38,7 +38,7 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
 # args 객체 안에 모든 옵션이 저장됨
 args = parser.parse_args()
 
-# no_accel 옵션 사용 안하고 가속기 사용 가능하면 use_accel = True, 아니면 False
+# no_accel 옵션 사용 && 가속기 사용 가능하면 use_accel = True, 아니면 False
 use_accel = not args.no_accel and torch.accelerator.is_available()
 
 torch.manual_seed(args.seed) #재현성 확보
