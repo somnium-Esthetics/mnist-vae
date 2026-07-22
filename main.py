@@ -52,47 +52,58 @@ else:
 print(f"Using device: {device}")
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_accel else {}
-train_loader = torch.utils.data.DataLoader(
+train_loader = torch.utils.data.DataLoader( #data를 일정한 크기의 betch로 나누어 모델에 전달하는 객체
     # MNIST 데이터셋 다운로드 및 로드
     datasets.MNIST('../data', train=True, download=True,
                    transform=transforms.ToTensor()),# PIL image -> Tensor  
-    batch_size=args.batch_size, shuffle=True, **kwargs)
+    batch_size=args.batch_size, shuffle=True, **kwargs) #betch size 128로 설정해둠
+#위에선 train데이터 사용. test_loader는 test데이터 사용
 test_loader = torch.utils.data.DataLoader(
     datasets.MNIST('../data', train=False, transform=transforms.ToTensor()),
     batch_size=args.batch_size, shuffle=False, **kwargs)
 
 
 class VAE(nn.Module):
-    def __init__(self):
-        super(VAE, self).__init__()
-
+    def __init__(self): #생성자
+        super(VAE, self).__init__() #부모 클래스인 nn.Module의 초기화 먼저 실행
+        #encoder층. 입력차원(x_i),출력차원, 선형변환
         self.fc1 = nn.Linear(784, 400)
+        #평균 mu(x_i) 출력 층
         self.fc21 = nn.Linear(400, 20)
+        #분산 logvar(x_i) 출력 층
         self.fc22 = nn.Linear(400, 20)
+
+        #decoder층. 입력차원(z_i),출력차원, 선형변환
         self.fc3 = nn.Linear(20, 400)
+        #decoder 출력층. 최종이미지 복원.
         self.fc4 = nn.Linear(400, 784)
 
+    # x_i -> z의 분포 파라미터. mu(x_i), logvar(x_i)
     def encode(self, x):
-        h1 = F.relu(self.fc1(x))
-        return self.fc21(h1), self.fc22(h1)
+        h1 = F.relu(self.fc1(x)) #fc1층 통과 후 ReLU 활성화 함수 적용. ReLU(a) = max(0,a)
+        return self.fc21(h1), self.fc22(h1) #mu(x_i), logvar(x_i) 반환
 
+    #q(z|x) = N(μ, σ²)
     def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5*logvar)
-        eps = torch.randn_like(std)
+        std = torch.exp(0.5*logvar) #log(a^2)이니까
+        eps = torch.randn_like(std) #std와 동일한 shape의 난수 텐서
         return mu + eps*std
 
+    #z -> x^ 복원
     def decode(self, z):
         h3 = F.relu(self.fc3(z))
+        #위에 ToTensor()에서 0~1로 정규화->sigmoid로 0~1로 복원
         return torch.sigmoid(self.fc4(h3))
-
+    #x_i -> z -> x^
     def forward(self, x):
-        mu, logvar = self.encode(x.view(-1, 784))
+        mu, logvar = self.encode(x.view(-1, 784)) #원래 MNIST의 shape은 (batch_size, 1, 28, 28)인데, fc1층에 넣기 위해 (batch_size, 784)로 변환
         z = self.reparameterize(mu, logvar)
+        #x^, mu, logvar 반환. mu, logvar는 loss 계산에 사용됨.
         return self.decode(z), mu, logvar
 
 
-model = VAE().to(device)
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
+model = VAE().to(device)#모델 객체 생성, 모델의 파라미터 -> device로 이동
+optimizer = optim.Adam(model.parameters(), lr=1e-3) #옵티마이저
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
