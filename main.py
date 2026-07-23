@@ -118,54 +118,60 @@ def loss_function(recon_x, x, mu, logvar): #x^[128,784], x[128,1,28,28], mu[128,
     # -E_q(z;pai)[D_KL(q(z|x)||p(z))].즉, KL divergence loss
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     # -1/2 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-    return BCE + KLD
+    return BCE + KLD #스칼라 텐서
 
 
 def train(epoch):
-    model.train()
-    train_loss = 0
-    for batch_idx, (data, _) in enumerate(train_loader):
-        data = data.to(device)
-        optimizer.zero_grad()
-        recon_batch, mu, logvar = model(data)
-        loss = loss_function(recon_batch, data, mu, logvar)
-        loss.backward()
-        train_loss += loss.item()
-        optimizer.step()
-        if batch_idx % args.log_interval == 0:
+    model.train()#학습 모드로 바꿈
+    train_loss = 0 #epoch들의 loss 누적저장 변수
+    for batch_idx, (data, _) in enumerate(train_loader): #(data, target)을 batch 단위로 제공, _ = target은 사용하지 않음
+        data = data.to(device) #data -> device로 이동
+        optimizer.zero_grad() #이전 step의 gradient 초기화
+        # forward pass
+        recon_batch, mu, logvar = model(data) #[128,1,28,28] -> 모델에 맞는 shape으로 변환/ 입력
+        loss = loss_function(recon_batch, data, mu, logvar) #batch 하나에 대한 loss
+        loss.backward() #학습 가능한 파라미터의 gradient 계산
+        train_loss += loss.item() #batch loss들의 누적합
+        optimizer.step() #adam optimizer로 파라미터 update
+        if batch_idx % args.log_interval == 0: # log_interval 배수마다 로그 출력
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader),
                 loss.item() / len(data)))
-
+        #data = batch 사이즈
+    # 해당 epoch의 평균 loss 출력   
     print('====> Epoch: {} Average loss: {:.4f}'.format(
           epoch, train_loss / len(train_loader.dataset)))
 
-
+# 성능평가, reconstruction 결과 저장
 def test(epoch):
-    model.eval()
-    test_loss = 0
-    with torch.no_grad():
-        for i, (data, _) in enumerate(test_loader):
-            data = data.to(device)
-            recon_batch, mu, logvar = model(data)
+    model.eval() #평가, 추론모드
+    test_loss = 0 #전체 test에 대한 loss 누적저장 변수 초기화
+    with torch.no_grad(): #추론시 backprop 사용x.
+        for i, (data, _) in enumerate(test_loader):# tesr data 10000개, batch=128
+            data = data.to(device) #data -> device로 이동
+            recon_batch, mu, logvar = model(data) #[128,1,28,28] -> 모델에 맞는 shape으로 변환/ 입력
+            #batch에 대한 loss계산 후 누적합
             test_loss += loss_function(recon_batch, data, mu, logvar).item()
             if i == 0:
-                n = min(data.size(0), 8)
+                n = min(data.size(0), 8) #data = batch 사이즈, 이미지를 몇장 선택할거냐->n
+                #원본 이미지 shape으로 변환, 원본 이미지와 recon된 이미지를 이어붙여 저장 8->16장
                 comparison = torch.cat([data[:n],
                                       recon_batch.view(args.batch_size, 1, 28, 28)[:n]])
+                #파일 저장
                 save_image(comparison.cpu(),
                          'results/reconstruction_' + str(epoch) + '.png', nrow=n)
-
+    #10000장중 장단 평균 loss
     test_loss /= len(test_loader.dataset)
     print('====> Test set loss: {:.4f}'.format(test_loss))
 
+#실험 시작
 if __name__ == "__main__":
     for epoch in range(1, args.epochs + 1):
         train(epoch)
         test(epoch)
-        with torch.no_grad():
-            sample = torch.randn(64, 20).to(device)
-            sample = model.decode(sample).cpu()
-            save_image(sample.view(64, 1, 28, 28),
+        with torch.no_grad(): #VAE의 생성 능력 확인. backpropagation 필요 없음.
+            sample = torch.randn(64, 20).to(device) #z 64개 (20차원)
+            sample = model.decode(sample).cpu() #sample -> decoder -> x^
+            save_image(sample.view(64, 1, 28, 28), #이미지 원본 shape으로 저장
                        'results/sample_' + str(epoch) + '.png')
