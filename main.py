@@ -22,7 +22,7 @@ parser.add_argument('--batch-size', type=int, default=128, metavar='N',
 #e.g.) python main.py --epochs 20 형태로 사용 가능. default 값은 10.
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
-# --no-accel 옵션. CPU만 사용할 시 사용. default 값은 False.
+# --no-accel 옵션. CPU만 사용할 시 사용. default 값은 False
 parser.add_argument('--no-accel', action='store_true', 
                     help='disables accelerator')
 
@@ -139,7 +139,7 @@ def train(epoch):
                 100. * batch_idx / len(train_loader),
                 loss.item() / len(data)))
         #data = batch 사이즈
-    # 해당 epoch의 평균 loss 출력   
+    # 해당 epoch의 평균 loss 출력   (샘플당)
     print('====> Epoch: {} Average loss: {:.4f}'.format(
           epoch, train_loss / len(train_loader.dataset)))
 
