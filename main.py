@@ -68,20 +68,26 @@ class VAE(nn.Module):
         super(VAE, self).__init__() #부모 클래스인 nn.Module의 초기화 먼저 실행
         #encoder층. 입력차원(x_i),출력차원, 선형변환
         self.fc1 = nn.Linear(784, 400)
+        self.fc1_2 = nn.Linear(400, 200)
+        self.fc1_3 = nn.Linear(200, 100)
         #평균 mu(x_i) 출력 층
-        self.fc21 = nn.Linear(400, 20)
+        self.fc21 = nn.Linear(100, 20)
         #분산 logvar(x_i) 출력 층
-        self.fc22 = nn.Linear(400, 20)
+        self.fc22 = nn.Linear(100, 20)
 
         #decoder층. 입력차원(z_i),출력차원, 선형변환
-        self.fc3 = nn.Linear(20, 400)
+        self.fc3 = nn.Linear(20, 100)
+        self.fc3_2 = nn.Linear(100, 200)
+        self.fc3_3 = nn.Linear(200, 400)
         #decoder 출력층. 최종이미지 복원.
         self.fc4 = nn.Linear(400, 784)
 
     # x_i -> z의 분포 파라미터. mu(x_i), logvar(x_i)
     def encode(self, x):
         h1 = F.relu(self.fc1(x)) #fc1층 통과 후 ReLU 활성화 함수 적용. ReLU(a) = max(0,a)
-        return self.fc21(h1), self.fc22(h1) #mu(x_i), logvar(x_i) 반환
+        h1_2 = F.relu(self.fc1_2(h1))
+        h1_3 = F.relu(self.fc1_3(h1_2))
+        return self.fc21(h1_3), self.fc22(h1_3) #mu(x_i), logvar(x_i) 반환
 
     #q(z|x) = N(μ, σ²)
     def reparameterize(self, mu, logvar):
@@ -92,8 +98,10 @@ class VAE(nn.Module):
     #z -> x^ 복원
     def decode(self, z):
         h3 = F.relu(self.fc3(z))
+        h3_2 = F.relu(self.fc3_2(h3))
+        h3_3 = F.relu(self.fc3_3(h3_2))
         #위에 ToTensor()에서 0~1로 정규화->sigmoid로 0~1로 복원
-        return torch.sigmoid(self.fc4(h3))
+        return torch.sigmoid(self.fc4(h3_3))
     #x_i -> z -> x^
     def forward(self, x):
         mu, logvar = self.encode(x.view(-1, 784)) #원래 MNIST의 shape은 (batch_size, 1, 28, 28)인데, fc1층에 넣기 위해 (batch_size, 784)로 변환
@@ -160,7 +168,7 @@ def test(epoch):
                                       recon_batch.view(args.batch_size, 1, 28, 28)[:n]])
                 #파일 저장
                 save_image(comparison.cpu(),
-                         'results/reconstruction_' + str(epoch) + '.png', nrow=n)
+                         'results/reconstruction_2_' + str(epoch) + '.png', nrow=n)
     #10000장중 장단 평균 loss
     test_loss /= len(test_loader.dataset)
     print('====> Test set loss: {:.4f}'.format(test_loss))
@@ -174,4 +182,4 @@ if __name__ == "__main__":
             sample = torch.randn(64, 20).to(device) #z 64개 (20차원)
             sample = model.decode(sample).cpu() #sample -> decoder -> x^
             save_image(sample.view(64, 1, 28, 28), #이미지 원본 shape으로 저장
-                       'results/sample_' + str(epoch) + '.png')
+                       'results/sample_2_' + str(epoch) + '.png')
